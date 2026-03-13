@@ -102,7 +102,7 @@ input[type=number]{width:68px;flex:none;}
 /* ── CUSTOMIZE ── */
 .swatch-row{display:flex;gap:7px;flex-wrap:wrap;margin-top:6px;}
 .swatch {
-  width:32px;height:32px;border-radius:50%;cursor:pointer;border:3px solid transparent;
+  width:28px;height:28px;border-radius:50%;cursor:pointer;border:3px solid transparent;
   transition:transform .12s,border-color .12s;
   box-shadow:0 0 6px rgba(0,0,0,0.6);
 }
@@ -115,6 +115,22 @@ input[type=number]{width:68px;flex:none;}
 }
 .maze-swatch:hover{transform:scale(1.1);}
 .maze-swatch.active{border-color:#fff;transform:scale(1.15);}
+
+/* Background swatches */
+.bg-swatch-wrap{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;}
+.bg-swatch{width:44px;height:36px;border-radius:6px;border:2px solid #333;transition:transform .12s,border-color .12s;}
+.bg-swatch:hover{transform:scale(1.08);}
+.bg-swatch-wrap.active .bg-swatch{border-color:#fff;transform:scale(1.1);}
+.bg-swatch-name{font-size:5px;color:#555;font-family:'Press Start 2P',monospace;text-align:center;max-width:46px;line-height:1.4;}
+.bg-swatch-wrap.active .bg-swatch-name{color:var(--cyan);}
+
+/* Ghost color theme chips */
+.gct-chip{display:flex;flex-direction:column;align-items:center;gap:3px;cursor:pointer;padding:5px 4px;border:1px solid #222;border-radius:4px;transition:border-color .12s;}
+.gct-chip.active{border-color:#fff;}
+.gct-chip.active .gct-name{color:var(--cyan);}
+.gct-dots{display:flex;gap:2px;}
+.gct-dot{width:12px;height:12px;border-radius:50%;}
+.gct-name{font-size:5px;color:#444;font-family:'Press Start 2P',monospace;}
 
 /* Speed/Eyes selectors */
 .option-row{display:flex;gap:6px;margin-top:6px;}
@@ -132,6 +148,19 @@ input[type=number]{width:68px;flex:none;}
 .ghost-prev.active canvas{border-color:#fff;}
 .ghost-prev-label{font-size:5px;color:#444;}
 .ghost-prev.active .ghost-prev-label{color:var(--cyan);}
+
+/* Toggle */
+.toggle-row{display:flex;align-items:center;gap:10px;margin-top:6px;}
+.toggle{width:42px;height:22px;border-radius:11px;background:#111;border:1px solid #333;cursor:pointer;position:relative;transition:background .2s;}
+.toggle.on{background:rgba(255,80,120,0.3);border-color:#ff5078;}
+.toggle::after{content:'';position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:#444;transition:transform .2s,background .2s;}
+.toggle.on::after{transform:translateX(20px);background:#ff5078;}
+.toggle-label{font-size:6px;color:#666;}
+.toggle.on + .toggle-label{color:#ff80a0;}
+
+/* Pickup notification */
+.pickup-notif{position:absolute;font-family:'Press Start 2P',monospace;font-size:8px;color:#ff80a0;text-shadow:0 0 8px #ff5078;pointer-events:none;z-index:100;animation:floatUp .9s ease forwards;}
+@keyframes floatUp{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-30px)}}
 
 .btn-start {
   width:100%; background:var(--yellow); color:#000; border:none; border-radius:4px;
@@ -213,8 +242,23 @@ input[type=number]{width:68px;flex:none;}
   </div>
 
   <div class="card">
+    <div class="card-label">◉ DOT COLOR</div>
+    <div class="swatch-row" id="dot-colors"></div>
+  </div>
+
+  <div class="card">
     <div class="card-label">◉ GHOST STYLE</div>
     <div class="ghost-pick" id="ghost-pick"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">◈ GHOST COLOR THEME</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;" id="ghost-color-themes"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">◆ BACKGROUND</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;margin-top:6px;" id="bg-colors"></div>
   </div>
 
   <div class="card">
@@ -225,6 +269,15 @@ input[type=number]{width:68px;flex:none;}
       <button class="opt-btn" data-v="1.4">FAST</button>
       <button class="opt-btn" data-v="1.9">INSANE</button>
     </div>
+  </div>
+
+  <div class="card">
+    <div class="card-label">💗 HALF-HEART POWER-UPS</div>
+    <div class="toggle-row">
+      <div class="toggle on" id="halfheart-toggle" onclick="toggleHalfHeart()"></div>
+      <span class="toggle-label" id="halfheart-label">ENABLED — collect 2 halves for an extra life</span>
+    </div>
+    <div style="margin-top:8px;font-size:6px;color:#444;line-height:1.8;">Rare pickups in the maze. Two halves = +1 life.<br>❤️ Full heart hides in the ghost house.</div>
   </div>
 
   <div class="card">
@@ -260,7 +313,7 @@ input[type=number]{width:68px;flex:none;}
 // ═══════════════════════════════════════════════════════════
 let audioCtx = null;
 let musicEnabled = true;
-let musicNode = null;  // currently playing music oscillators
+let musicNode = null;
 let musicInterval = null;
 
 function getAudio(){
@@ -269,7 +322,6 @@ function getAudio(){
   return audioCtx;
 }
 
-// Tiny synth tone
 function playTone(freq, type, dur, vol=0.18, startTime=null){
   try{
     const ac=getAudio();
@@ -285,7 +337,6 @@ function playTone(freq, type, dur, vol=0.18, startTime=null){
 }
 
 function playEat(){
-  // Classic waka-waka: alternating hi/low blip
   const ac=getAudio(), now=ac.currentTime;
   const freq = (Date.now()>>7)&1 ? 800 : 400;
   playTone(freq,'square',0.06,0.12,now);
@@ -303,7 +354,6 @@ function playEatGhost(){
 
 function playDeath(){
   const ac=getAudio(), now=ac.currentTime;
-  // Descending chromatic death sound
   const freqs=[494,466,440,415,392,370,349,330,311,294,277,261];
   freqs.forEach((f,i)=>playTone(f,'sawtooth',0.12,0.2,now+i*0.07));
 }
@@ -314,19 +364,23 @@ function playWin(){
   melody.forEach((f,i)=>playTone(f,'square',0.18,0.22,now+i*0.13));
 }
 
-// ── BACKGROUND MUSIC ──────────────────────────────────────
-// Classic Pac-Man intermission theme approximation using Web Audio
+function playHalfHeart(){
+  const ac=getAudio(), now=ac.currentTime;
+  [523,659,784].forEach((f,i)=>playTone(f,'triangle',0.15,0.14,now+i*0.1));
+}
+
+function playExtraLife(){
+  const ac=getAudio(), now=ac.currentTime;
+  [523,659,784,1047,1175,1319].forEach((f,i)=>playTone(f,'square',0.2,0.2,now+i*0.09));
+}
+
 const BGM_NOTES = [
-  // Measure 1
   [494,0.15],[523,0.15],[587,0.15],[659,0.15],[698,0.15],[784,0.15],[880,0.3],
   [784,0.15],[698,0.15],[659,0.15],[587,0.15],[523,0.15],[494,0.3],
-  // Measure 2
   [440,0.15],[494,0.15],[523,0.15],[587,0.15],[659,0.15],[698,0.15],[784,0.3],
   [698,0.15],[659,0.15],[587,0.15],[523,0.15],[494,0.15],[440,0.3],
-  // Waka theme
   [659,0.1],[0,0.05],[587,0.1],[0,0.05],[523,0.1],[0,0.05],[494,0.1],[0,0.1],
   [523,0.1],[0,0.05],[587,0.1],[0,0.05],[659,0.1],[0,0.05],[784,0.25],[0,0.15],
-  // Descend
   [784,0.1],[740,0.1],[698,0.1],[659,0.1],[622,0.1],[587,0.1],[554,0.1],[523,0.3],
 ];
 
@@ -337,7 +391,6 @@ function startBGM(){
   bgmRunning=true; bgmPos=0;
   playNextBGMNote();
 }
-
 function playNextBGMNote(){
   if(!bgmRunning||!musicEnabled) return;
   const note=BGM_NOTES[bgmPos%BGM_NOTES.length];
@@ -346,24 +399,31 @@ function playNextBGMNote(){
   bgmPos++;
   bgmTimer=setTimeout(playNextBGMNote, dur*1000);
 }
-
 function stopBGM(){
   bgmRunning=false;
   if(bgmTimer){ clearTimeout(bgmTimer); bgmTimer=null; }
 }
 
 // ═══════════════════════════════════════════════════════════
-//  CUSTOMISATION OPTIONS
+//  CUSTOMISATION DATA
 // ═══════════════════════════════════════════════════════════
 const PAC_COLORS=[
   {c:'#FFD700',name:'Classic'},
   {c:'#FF6B35',name:'Orange'},
   {c:'#FF2D55',name:'Red'},
   {c:'#FF69B4',name:'Pink'},
+  {c:'#FF85C2',name:'Hot Pink'},
   {c:'#39FF14',name:'Neon'},
+  {c:'#00FF9F',name:'Mint'},
   {c:'#00CFFF',name:'Ice'},
+  {c:'#5B8FFF',name:'Periwinkle'},
   {c:'#BF5AF2',name:'Purple'},
+  {c:'#FF44CC',name:'Magenta'},
   {c:'#FFFFFF',name:'White'},
+  {c:'#C0C0C0',name:'Silver'},
+  {c:'#FF4500',name:'Ember'},
+  {c:'#7FFF00',name:'Lime'},
+  {c:'#FF6FD8',name:'Candy'},
 ];
 
 const MAZE_COLORS=[
@@ -373,94 +433,94 @@ const MAZE_COLORS=[
   {c:'#BF5AF2',glow:'rgba(191,90,242,0.4)',name:'Purple'},
   {c:'#00CFFF',glow:'rgba(0,207,255,0.4)',name:'Cyan'},
   {c:'#FF9F0A',glow:'rgba(255,159,10,0.4)',name:'Orange'},
+  {c:'#FF69B4',glow:'rgba(255,105,180,0.4)',name:'Pink'},
+  {c:'#00FF9F',glow:'rgba(0,255,159,0.4)',name:'Mint'},
+  {c:'#FFD700',glow:'rgba(255,215,0,0.4)',name:'Gold'},
+  {c:'#FF6B35',glow:'rgba(255,107,53,0.4)',name:'Coral'},
+  {c:'#C0C0C0',glow:'rgba(192,192,192,0.3)',name:'Silver'},
+  {c:'#FF44CC',glow:'rgba(255,68,204,0.4)',name:'Magenta'},
+];
+
+const DOT_COLORS=[
+  {c:'#ffb8ae',name:'Peach'},
+  {c:'#FFD700',name:'Gold'},
+  {c:'#00FFFF',name:'Cyan'},
+  {c:'#FF69B4',name:'Pink'},
+  {c:'#39FF14',name:'Green'},
+  {c:'#FFFFFF',name:'White'},
+  {c:'#BF5AF2',name:'Purple'},
+  {c:'#FF6B35',name:'Orange'},
+  {c:'#00FF9F',name:'Mint'},
+  {c:'#FF2D55',name:'Red'},
+];
+
+const GHOST_COLOR_THEMES=[
+  {name:'CLASSIC', colors:['#FF0000','#FFB8FF','#00FFFF','#FFB847']},
+  {name:'NEON',    colors:['#FF2D55','#39FF14','#00CFFF','#FF9F0A']},
+  {name:'CANDY',   colors:['#FF85C2','#C77DFF','#74C0FC','#FFD43B']},
+  {name:'DARK',    colors:['#8B0000','#4B0082','#006400','#8B4513']},
+  {name:'PASTEL',  colors:['#FFB3BA','#BAE1FF','#BAFFC9','#FFFFBA']},
+  {name:'FIRE',    colors:['#FF4500','#FF6B35','#FF9F0A','#FFD700']},
+  {name:'ICE',     colors:['#00BFFF','#87CEEB','#B0E0E6','#E0FFFF']},
+  {name:'MONO',    colors:['#FFFFFF','#AAAAAA','#666666','#333333']},
+];
+
+const BG_OPTIONS=[
+  {name:'VOID',    preview:'linear-gradient(135deg,#000 0%,#0a0010 100%)',
+   css:'#000000',
+   fill:(c,w,h)=>{ c.fillStyle='#000'; c.fillRect(0,0,w,h); }},
+  {name:'DEEP SEA',preview:'linear-gradient(135deg,#000814 0%,#023e8a 100%)',
+   css:'linear-gradient(180deg,#000814 0%,#001233 50%,#023e8a 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'#000814'); g.addColorStop(0.5,'#001233'); g.addColorStop(1,'#023e8a'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
+  {name:'NEBULA',  preview:'linear-gradient(135deg,#0d0221 0%,#2d1b69 100%)',
+   css:'linear-gradient(135deg,#0d0221 0%,#1a0533 40%,#2d1b69 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#0d0221'); g.addColorStop(0.4,'#1a0533'); g.addColorStop(1,'#2d1b69'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
+  {name:'INFERNO', preview:'linear-gradient(135deg,#0a0000 0%,#3d0000 100%)',
+   css:'linear-gradient(180deg,#0a0000 0%,#1c0a00 50%,#3d0000 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'#0a0000'); g.addColorStop(0.5,'#1c0a00'); g.addColorStop(1,'#3d0000'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
+  {name:'AURORA',  preview:'linear-gradient(135deg,#000a00 0%,#002a1a 100%)',
+   css:'linear-gradient(160deg,#000a00 0%,#001a10 40%,#002a1a 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#000a00'); g.addColorStop(0.4,'#001a10'); g.addColorStop(1,'#002a1a'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
+  {name:'DUSK',    preview:'linear-gradient(135deg,#0a0010 0%,#2a0020 100%)',
+   css:'linear-gradient(180deg,#0a0010 0%,#1a001a 40%,#2a0020 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'#0a0010'); g.addColorStop(0.4,'#1a001a'); g.addColorStop(1,'#2a0020'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
+  {name:'EMBER',   preview:'linear-gradient(135deg,#0a0500 0%,#2a1500 100%)',
+   css:'linear-gradient(160deg,#0a0500 0%,#1a0e00 50%,#2a1500 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,w,h); g.addColorStop(0,'#0a0500'); g.addColorStop(0.5,'#1a0e00'); g.addColorStop(1,'#2a1500'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
+  {name:'ARCTIC',  preview:'linear-gradient(135deg,#000a10 0%,#002030 100%)',
+   css:'linear-gradient(180deg,#000a10 0%,#001520 50%,#002030 100%)',
+   fill:(c,w,h)=>{ const g=c.createLinearGradient(0,0,0,h); g.addColorStop(0,'#000a10'); g.addColorStop(0.5,'#001520'); g.addColorStop(1,'#002030'); c.fillStyle=g; c.fillRect(0,0,w,h); }},
 ];
 
 const GHOST_STYLES=[
   {id:'classic',name:'CLASSIC'},
   {id:'round',  name:'ROUND'},
   {id:'pixel',  name:'PIXEL'},
+  {id:'spiky',  name:'SPIKY'},
 ];
 
-let selectedPacColor = PAC_COLORS[0];
-let selectedMazeColor = MAZE_COLORS[0];
+const HALFHEART_CANDIDATES=[
+  {r:1,c:5},{r:1,c:15},{r:4,c:10},{r:6,c:5},{r:6,c:15},
+  {r:14,c:5},{r:14,c:15},{r:18,c:5},{r:18,c:15},{r:20,c:10},
+  {r:4,c:3},{r:4,c:17},{r:20,c:3},{r:20,c:17},
+];
+
+// ── Selected state ──
+let selectedPacColor   = PAC_COLORS[0];
+let selectedMazeColor  = MAZE_COLORS[0];
+let selectedDotColor   = DOT_COLORS[0];
 let selectedGhostStyle = GHOST_STYLES[0];
-let selectedSpeed = 1.0;
+let selectedGhostTheme = GHOST_COLOR_THEMES[0];
+let selectedBg         = BG_OPTIONS[0];
+let selectedSpeed      = 1.0;
+let halfHeartEnabled   = true;
 
-function initCustomise(){
-  // Pac colors
-  const pcEl=document.getElementById('pac-colors');
-  PAC_COLORS.forEach((col,i)=>{
-    const s=document.createElement('div');
-    s.className='swatch'+(i===0?' active':'');
-    s.style.background=col.c;
-    s.title=col.name;
-    s.onclick=()=>{
-      selectedPacColor=col;
-      pcEl.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active'));
-      s.classList.add('active');
-    };
-    pcEl.appendChild(s);
-  });
-
-  // Maze colors
-  const mcEl=document.getElementById('maze-colors');
-  MAZE_COLORS.forEach((col,i)=>{
-    const s=document.createElement('div');
-    s.className='maze-swatch'+(i===0?' active':'');
-    s.style.background=col.c;
-    s.title=col.name;
-    s.onclick=()=>{
-      selectedMazeColor=col;
-      mcEl.querySelectorAll('.maze-swatch').forEach(x=>x.classList.remove('active'));
-      s.classList.add('active');
-    };
-    mcEl.appendChild(s);
-  });
-
-  // Ghost styles
-  const gpEl=document.getElementById('ghost-pick');
-  const GHOST_DEMO_COLORS=['#FF0000','#FFB8FF','#00FFFF','#FFB847'];
-  GHOST_STYLES.forEach((gs,i)=>{
-    const wrap=document.createElement('div');
-    wrap.className='ghost-prev'+(i===0?' active':'');
-    const can=document.createElement('canvas');
-    can.width=52; can.height=52;
-    const pc=can.getContext('2d');
-    // Draw preview ghost
-    pc.fillStyle='#000'; pc.fillRect(0,0,52,52);
-    drawGhostStyle(pc,26,32,18,GHOST_DEMO_COLORS[0],gs.id,false,false,0);
-    const lbl=document.createElement('div');
-    lbl.className='ghost-prev-label'; lbl.textContent=gs.name;
-    wrap.appendChild(can); wrap.appendChild(lbl);
-    wrap.onclick=()=>{
-      selectedGhostStyle=gs;
-      gpEl.querySelectorAll('.ghost-prev').forEach(x=>x.classList.remove('active'));
-      wrap.classList.add('active');
-    };
-    gpEl.appendChild(wrap);
-  });
-
-  // Speed
-  document.querySelectorAll('#speed-opts .opt-btn').forEach(btn=>{
-    btn.onclick=()=>{
-      selectedSpeed=parseFloat(btn.dataset.v);
-      document.querySelectorAll('#speed-opts .opt-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-    };
-  });
-
-  // Music
-  document.querySelectorAll('#music-opts .opt-btn').forEach(btn=>{
-    btn.onclick=()=>{
-      musicEnabled=btn.dataset.v==='on';
-      document.querySelectorAll('#music-opts .opt-btn').forEach(b=>b.classList.remove('active'));
-      btn.classList.add('active');
-      if(!musicEnabled) stopBGM();
-    };
-  });
+function toggleHalfHeart(){
+  halfHeartEnabled = !halfHeartEnabled;
+  document.getElementById('halfheart-toggle').classList.toggle('on', halfHeartEnabled);
+  document.getElementById('halfheart-label').textContent =
+    halfHeartEnabled ? 'ENABLED — collect 2 halves for an extra life' : 'DISABLED';
 }
-
-window.addEventListener('DOMContentLoaded',initCustomise);
 
 // ═══════════════════════════════════════════════════════════
 //  SETUP
@@ -494,7 +554,7 @@ const ctx=C.getContext('2d');
 const COLS=21, ROWS=23;
 let CELL,W,H;
 let targetDots,pool;
-let pacman,ghosts,dots,powerDots,score,lives,gameState,animId,eatCount;
+let pacman,ghosts,dots,powerDots,halfHearts,fullHeart,score,lives,halfHeartsCollected,gameState,animId,eatCount;
 let frightenTimer=0;
 let lastTime=0,accum=0;
 const STEP=1000/60;
@@ -526,8 +586,6 @@ const MAP_TEMPLATE=[
   [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
 ];
 
-const GHOST_COLORS=['#FF0000','#FFB8FF','#00FFFF','#FFB847'];
-
 // ═══════════════════════════════════════════════════════════
 //  START / INIT
 // ═══════════════════════════════════════════════════════════
@@ -539,17 +597,29 @@ function startGame(){
   const maxW=Math.min(window.innerWidth-8,480);
   CELL=Math.floor(maxW/COLS); W=CELL*COLS; H=CELL*ROWS;
   C.width=W; C.height=H;
-  // Apply maze colour to border
   C.style.borderColor=selectedMazeColor.c;
   C.style.boxShadow=`0 0 20px ${selectedMazeColor.glow},0 0 60px ${selectedMazeColor.glow.replace('0.4','0.1')}`;
   document.getElementById('target-val').textContent=targetDots;
-  // Start BGM (needs user gesture — already happened via button click)
+  document.body.style.background=selectedBg.css;
   startBGM();
   initRound();
 }
 
 function buildMap(){
   return MAP_TEMPLATE.map(r=>[...r]);
+}
+
+function spawnHalfHearts(map){
+  if(!halfHeartEnabled) return [];
+  const shuffled=[...HALFHEART_CANDIDATES].sort(()=>Math.random()-0.5);
+  const count=2+(Math.random()>0.5?1:0);
+  const chosen=[];
+  for(let i=0;i<shuffled.length&&chosen.length<count;i++){
+    const pos=shuffled[i];
+    if(map[pos.r]&&(map[pos.r][pos.c]===0||map[pos.r][pos.c]===2))
+      chosen.push({r:pos.r,c:pos.c,eaten:false,side:Math.random()>0.5?'L':'R'});
+  }
+  return chosen;
 }
 
 function initRound(){
@@ -560,6 +630,10 @@ function initRound(){
     if(map[r][c]===0) dots.push({r,c,eaten:false});
     if(map[r][c]===3) powerDots.push({r,c,eaten:false});
   }
+  halfHearts=spawnHalfHearts(map);
+  halfHeartsCollected=0;
+  fullHeart={r:10,c:10,eaten:false};
+
   pacman={
     r:16,c:10, x:10*CELL+CELL/2, y:16*CELL+CELL/2,
     tx:10*CELL+CELL/2, ty:16*CELL+CELL/2,
@@ -567,12 +641,12 @@ function initRound(){
     mouthAngle:0.25,mouthDir:1,map
   };
   ghosts=[
-    {r:10,c:8,  x:8*CELL+CELL/2,  y:10*CELL+CELL/2,color:GHOST_COLORS[0],dir:{r:0,c:1}, frightened:false,eaten:false,scatter:0},
-    {r:10,c:10, x:10*CELL+CELL/2, y:10*CELL+CELL/2,color:GHOST_COLORS[1],dir:{r:-1,c:0},frightened:false,eaten:false,scatter:20},
-    {r:10,c:12, x:12*CELL+CELL/2, y:10*CELL+CELL/2,color:GHOST_COLORS[2],dir:{r:0,c:-1},frightened:false,eaten:false,scatter:40},
-    {r:9, c:10, x:10*CELL+CELL/2, y:9*CELL+CELL/2, color:GHOST_COLORS[3],dir:{r:1,c:0}, frightened:false,eaten:false,scatter:60},
+    {r:10,c:8,  x:8*CELL+CELL/2,  y:10*CELL+CELL/2,color:selectedGhostTheme.colors[0],dir:{r:0,c:1}, frightened:false,eaten:false,scatter:0},
+    {r:10,c:10, x:10*CELL+CELL/2, y:10*CELL+CELL/2,color:selectedGhostTheme.colors[1],dir:{r:-1,c:0},frightened:false,eaten:false,scatter:20},
+    {r:10,c:12, x:12*CELL+CELL/2, y:10*CELL+CELL/2,color:selectedGhostTheme.colors[2],dir:{r:0,c:-1},frightened:false,eaten:false,scatter:40},
+    {r:9, c:10, x:10*CELL+CELL/2, y:9*CELL+CELL/2, color:selectedGhostTheme.colors[3],dir:{r:1,c:0}, frightened:false,eaten:false,scatter:60},
   ];
-  score=0; eatCount=0; lives=3; gameState='waiting'; frightenTimer=0;
+  score=0; eatCount=0; lives=1; gameState='waiting'; frightenTimer=0;
   updateHUD();
   document.getElementById('overlay').style.display='none';
   if(animId) cancelAnimationFrame(animId);
@@ -588,6 +662,22 @@ function updateHUD(){
     s.textContent='◐'; s.style.color=selectedPacColor.c; s.style.fontSize='12px';
     ld.appendChild(s);
   }
+  if(halfHeartEnabled&&halfHeartsCollected>0){
+    const hh=document.createElement('span');
+    hh.style.cssText='font-size:12px;margin-left:4px;color:#ff80a0;text-shadow:0 0 6px #ff5078;';
+    hh.textContent='💗';
+    ld.appendChild(hh);
+  }
+}
+
+function showPickupNotif(text,x,y){
+  const el=document.createElement('div');
+  el.className='pickup-notif';
+  el.textContent=text;
+  el.style.left=(x-20)+'px';
+  el.style.top=(y+34)+'px';
+  document.getElementById('game').appendChild(el);
+  setTimeout(()=>el.remove(),900);
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -662,24 +752,24 @@ function tick(){
     }
   }
 
-  // Mouth
   pacman.mouthAngle+=0.05*pacman.mouthDir;
   if(pacman.mouthAngle>0.28||pacman.mouthAngle<0.02) pacman.mouthDir*=-1;
 
-  // Eat dots
   const eatR=CELL*0.5;
+
+  // Eat dots
   dots.forEach(d=>{
     if(!d.eaten){
       const ddx=pacman.x-(d.c*CELL+CELL/2), ddy=pacman.y-(d.r*CELL+CELL/2);
       if(ddx*ddx+ddy*ddy<eatR*eatR){
         d.eaten=true; score+=10; eatCount++;
-        playEat();
-        updateHUD();
+        playEat(); updateHUD();
         if(eatCount>=targetDots){ triggerWin(); return; }
       }
     }
   });
 
+  // Eat power dots
   powerDots.forEach(d=>{
     if(!d.eaten){
       const ddx=pacman.x-(d.c*CELL+CELL/2), ddy=pacman.y-(d.r*CELL+CELL/2);
@@ -687,11 +777,38 @@ function tick(){
         d.eaten=true; score+=50;
         frightenTimer=360;
         ghosts.forEach(g=>{g.frightened=true;g.eaten=false;});
-        playPowerPellet();
+        playPowerPellet(); updateHUD();
+      }
+    }
+  });
+
+  // Eat half-hearts
+  halfHearts.forEach(hh=>{
+    if(!hh.eaten){
+      const ddx=pacman.x-(hh.c*CELL+CELL/2), ddy=pacman.y-(hh.r*CELL+CELL/2);
+      if(ddx*ddx+ddy*ddy<eatR*eatR){
+        hh.eaten=true; halfHeartsCollected++;
+        if(halfHeartsCollected>=2){
+          halfHeartsCollected=0; lives++;
+          playExtraLife(); showPickupNotif('+1 LIFE! 💖',pacman.x,pacman.y);
+        } else {
+          playHalfHeart(); showPickupNotif('½ HEART 💗',pacman.x,pacman.y);
+        }
         updateHUD();
       }
     }
   });
+
+  // Eat full heart
+  if(!fullHeart.eaten){
+    const fhx=fullHeart.c*CELL+CELL/2, fhy=fullHeart.r*CELL+CELL/2;
+    const ddx=pacman.x-fhx, ddy=pacman.y-fhy;
+    if(ddx*ddx+ddy*ddy<eatR*eatR){
+      fullHeart.eaten=true; lives++;
+      playExtraLife(); showPickupNotif('+1 LIFE! ❤️',pacman.x,pacman.y);
+      updateHUD();
+    }
+  }
 
   if(frightenTimer>0){ frightenTimer--; if(frightenTimer===0) ghosts.forEach(g=>{g.frightened=false;}); }
 
@@ -746,7 +863,7 @@ function tick(){
 //  DRAW
 // ═══════════════════════════════════════════════════════════
 function draw(){
-  ctx.fillStyle='#000'; ctx.fillRect(0,0,W,H);
+  selectedBg.fill(ctx,W,H);
   const map=pacman.map;
   const mazeC=selectedMazeColor.c;
 
@@ -755,14 +872,13 @@ function draw(){
     if(map[r][c]===1){
       const x=c*CELL,y=r*CELL;
       ctx.fillStyle=mazeC; ctx.fillRect(x+1,y+1,CELL-2,CELL-2);
-      // Inner highlights for 3D feel
       ctx.fillStyle=lighten(mazeC,40); ctx.fillRect(x+2,y+2,CELL-6,2); ctx.fillRect(x+2,y+2,2,CELL-6);
       ctx.fillStyle=darken(mazeC,30);  ctx.fillRect(x+CELL-3,y+2,2,CELL-4); ctx.fillRect(x+2,y+CELL-3,CELL-4,2);
     }
   }
 
   // Dots
-  ctx.fillStyle='#ffb8ae';
+  ctx.fillStyle=selectedDotColor.c;
   dots.forEach(d=>{
     if(!d.eaten){
       ctx.beginPath(); ctx.arc(d.c*CELL+CELL/2,d.r*CELL+CELL/2,CELL*0.1,0,Math.PI*2); ctx.fill();
@@ -779,6 +895,12 @@ function draw(){
     });
     ctx.shadowBlur=0;
   }
+
+  // Half-hearts
+  halfHearts.forEach(hh=>{ if(!hh.eaten) drawHalfHeart(hh.c*CELL+CELL/2,hh.r*CELL+CELL/2,CELL*0.32,hh.side); });
+
+  // Full heart at ghost house
+  if(!fullHeart.eaten) drawFullHeart(fullHeart.c*CELL+CELL/2,fullHeart.r*CELL+CELL/2,CELL*0.38);
 
   // Progress bar
   const prog=Math.min(eatCount/targetDots,1);
@@ -800,6 +922,51 @@ function draw(){
   }
 }
 
+function drawHalfHeart(x,y,r,side){
+  const pulse=0.7+0.3*Math.sin(Date.now()*0.004);
+  ctx.save();
+  ctx.shadowColor='#ff5078'; ctx.shadowBlur=8*pulse;
+  ctx.fillStyle=`rgba(255,80,120,${0.85*pulse})`;
+  ctx.strokeStyle='#ff80a0'; ctx.lineWidth=1;
+  ctx.beginPath();
+  if(side==='L'){
+    ctx.moveTo(x,y+r*0.9);
+    ctx.bezierCurveTo(x-r*1.2,y+r*0.2,x-r*1.2,y-r*0.8,x,y-r*0.3);
+    ctx.lineTo(x,y+r*0.9);
+  } else {
+    ctx.moveTo(x,y+r*0.9);
+    ctx.bezierCurveTo(x+r*1.2,y+r*0.2,x+r*1.2,y-r*0.8,x,y-r*0.3);
+    ctx.lineTo(x,y+r*0.9);
+  }
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.strokeStyle='rgba(255,200,220,0.5)'; ctx.lineWidth=0.5;
+  ctx.beginPath(); ctx.moveTo(x,y-r*0.3); ctx.lineTo(x,y+r*0.9); ctx.stroke();
+  ctx.restore();
+}
+
+function drawFullHeart(x,y,r){
+  const pulse=0.65+0.35*Math.sin(Date.now()*0.005);
+  const beat=1.0+0.08*Math.sin(Date.now()*0.008);
+  ctx.save();
+  ctx.translate(x,y); ctx.scale(beat,beat); ctx.translate(-x,-y);
+  ctx.shadowColor='#ff1a4a'; ctx.shadowBlur=18*pulse;
+  ctx.beginPath();
+  const ty2=y-r*0.15;
+  ctx.moveTo(x,ty2+r*0.35);
+  ctx.bezierCurveTo(x-r*1.1,ty2-r*0.6,x-r*1.3,ty2+r*0.5,x,ty2+r*1.1);
+  ctx.bezierCurveTo(x+r*1.3,ty2+r*0.5,x+r*1.1,ty2-r*0.6,x,ty2+r*0.35);
+  ctx.closePath();
+  const grad=ctx.createRadialGradient(x-r*0.2,y-r*0.3,r*0.1,x,y,r*1.2);
+  grad.addColorStop(0,`rgba(255,120,150,${0.95*pulse})`);
+  grad.addColorStop(0.5,`rgba(220,30,80,${0.9*pulse})`);
+  grad.addColorStop(1,`rgba(140,0,40,${0.8*pulse})`);
+  ctx.fillStyle=grad; ctx.fill();
+  ctx.shadowBlur=0;
+  ctx.fillStyle=`rgba(255,255,255,${0.35*pulse})`;
+  ctx.beginPath(); ctx.ellipse(x-r*0.3,y-r*0.25,r*0.28,r*0.18,-0.5,0,Math.PI*2); ctx.fill();
+  ctx.restore();
+}
+
 function drawPacman(){
   const p=pacman;
   let baseAngle=0;
@@ -816,7 +983,6 @@ function drawPacman(){
   ctx.arc(p.x,p.y,CELL*0.45,baseAngle+mouth,baseAngle+Math.PI*2-mouth);
   ctx.closePath(); ctx.fill();
   ctx.shadowBlur=0;
-  // Eye
   const ex=p.x+Math.cos(baseAngle-Math.PI/4)*CELL*0.22;
   const ey=p.y+Math.sin(baseAngle-Math.PI/4)*CELL*0.22;
   ctx.fillStyle='#000'; ctx.beginPath(); ctx.arc(ex,ey,CELL*0.07,0,Math.PI*2); ctx.fill();
@@ -846,43 +1012,41 @@ function drawGhostStyle(c,x,y,r,col,style,frightened,eaten,ft){
     }
     c.closePath(); c.fill();
   } else if(style==='round'){
-    // Rounder ghost — full circle body with flat bottom
-    c.beginPath();
-    c.arc(x,y-r*0.05,r*0.95,0,Math.PI*2);
-    c.fill();
-    // Flat bottom cover
+    c.beginPath(); c.arc(x,y-r*0.05,r*0.95,0,Math.PI*2); c.fill();
     c.fillRect(x-r*0.95,y-r*0.05,r*1.9,r*0.9);
-    // Bumps at bottom
     c.beginPath();
-    for(let i=0;i<3;i++){
-      c.arc(x-r*0.65+i*r*0.65,y+r*0.85,r*0.3,0,Math.PI,true);
-    }
+    for(let i=0;i<3;i++) c.arc(x-r*0.65+i*r*0.65,y+r*0.85,r*0.3,0,Math.PI,true);
     c.fill();
   } else if(style==='pixel'){
-    // Blocky pixelated ghost
     const s=Math.floor(r/2.5);
     const gx=Math.round(x-r), gy=Math.round(y-r);
-    const pw=Math.round(r*2/s);
-    // Head arc approximated
     const pixels=[
-      [0,0,1,1,1,1,0,0],
-      [0,1,1,1,1,1,1,0],
-      [1,1,1,1,1,1,1,1],
-      [1,1,1,1,1,1,1,1],
-      [1,1,1,1,1,1,1,1],
-      [1,1,1,1,1,1,1,1],
-      [1,0,1,1,1,1,0,1],
-      [1,0,0,1,1,0,0,1],
+      [0,0,1,1,1,1,0,0],[0,1,1,1,1,1,1,0],[1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],
+      [1,1,1,1,1,1,1,1],[1,1,1,1,1,1,1,1],[1,0,1,1,1,1,0,1],[1,0,0,1,1,0,0,1],
     ];
-    pixels.forEach((row,ri)=>row.forEach((v,ci)=>{
-      if(v){ c.fillRect(gx+ci*s,gy+ri*s,s,s); }
-    }));
+    pixels.forEach((row,ri)=>row.forEach((v,ci)=>{ if(v) c.fillRect(gx+ci*s,gy+ri*s,s,s); }));
+  } else if(style==='spiky'){
+    c.beginPath();
+    c.moveTo(x-r,y+r*0.5);
+    const spikes=5;
+    for(let i=0;i<spikes;i++){
+      const angle=-Math.PI+(i/spikes)*Math.PI;
+      const midAngle=-Math.PI+((i+0.5)/spikes)*Math.PI;
+      c.lineTo(x+Math.cos(angle)*r,y+Math.sin(angle)*r*0.8);
+      c.lineTo(x+Math.cos(midAngle)*r*1.3,y+Math.sin(midAngle)*r*1.1);
+    }
+    c.lineTo(x+r,y+r*0.5);
+    for(let i=5;i>=0;i--){
+      const bx=x-r+(i/5)*r*2;
+      const by=i%2===0?y+r*0.5:y+r*0.85;
+      c.lineTo(bx,by);
+    }
+    c.closePath(); c.fill();
   }
 
   c.shadowBlur=0;
 
   if(!eaten&&!frightened){
-    // Eyes
     c.fillStyle='#fff';
     c.beginPath();c.ellipse(x-r*0.3,y-r*0.25,r*0.22,r*0.28,0,0,Math.PI*2);c.fill();
     c.beginPath();c.ellipse(x+r*0.3,y-r*0.25,r*0.22,r*0.28,0,0,Math.PI*2);c.fill();
@@ -958,9 +1122,97 @@ function restartRound(){ startBGM(); initRound(); }
 
 function backToSetup(){
   cancelAnimationFrame(animId); stopBGM();
+  document.body.style.background='';
   document.getElementById('game').style.display='none';
   document.getElementById('setup').style.display='flex';
 }
+
+// ═══════════════════════════════════════════════════════════
+//  INIT CUSTOMISE  — called last so drawGhostStyle is defined
+// ═══════════════════════════════════════════════════════════
+function initCustomise(){
+  // Pac colors
+  const pcEl=document.getElementById('pac-colors');
+  PAC_COLORS.forEach((col,i)=>{
+    const s=document.createElement('div');
+    s.className='swatch'+(i===0?' active':'');
+    s.style.background=col.c; s.title=col.name;
+    s.onclick=()=>{ selectedPacColor=col; pcEl.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); s.classList.add('active'); };
+    pcEl.appendChild(s);
+  });
+
+  // Maze colors
+  const mcEl=document.getElementById('maze-colors');
+  MAZE_COLORS.forEach((col,i)=>{
+    const s=document.createElement('div');
+    s.className='maze-swatch'+(i===0?' active':'');
+    s.style.background=col.c; s.title=col.name;
+    s.onclick=()=>{ selectedMazeColor=col; mcEl.querySelectorAll('.maze-swatch').forEach(x=>x.classList.remove('active')); s.classList.add('active'); };
+    mcEl.appendChild(s);
+  });
+
+  // Dot colors
+  const dcEl=document.getElementById('dot-colors');
+  DOT_COLORS.forEach((col,i)=>{
+    const s=document.createElement('div');
+    s.className='swatch'+(i===0?' active':'');
+    s.style.background=col.c; s.title=col.name;
+    s.onclick=()=>{ selectedDotColor=col; dcEl.querySelectorAll('.swatch').forEach(x=>x.classList.remove('active')); s.classList.add('active'); };
+    dcEl.appendChild(s);
+  });
+
+  // Ghost styles
+  const gpEl=document.getElementById('ghost-pick');
+  GHOST_STYLES.forEach((gs,i)=>{
+    const wrap=document.createElement('div');
+    wrap.className='ghost-prev'+(i===0?' active':'');
+    const can=document.createElement('canvas'); can.width=52; can.height=52;
+    const pc=can.getContext('2d');
+    pc.fillStyle='#000'; pc.fillRect(0,0,52,52);
+    drawGhostStyle(pc,26,32,18,GHOST_COLOR_THEMES[0].colors[0],gs.id,false,false,0);
+    const lbl=document.createElement('div'); lbl.className='ghost-prev-label'; lbl.textContent=gs.name;
+    wrap.appendChild(can); wrap.appendChild(lbl);
+    wrap.onclick=()=>{ selectedGhostStyle=gs; gpEl.querySelectorAll('.ghost-prev').forEach(x=>x.classList.remove('active')); wrap.classList.add('active'); };
+    gpEl.appendChild(wrap);
+  });
+
+  // Ghost color themes
+  const gctEl=document.getElementById('ghost-color-themes');
+  GHOST_COLOR_THEMES.forEach((theme,i)=>{
+    const wrap=document.createElement('div'); wrap.className='gct-chip'+(i===0?' active':'');
+    const dots=document.createElement('div'); dots.className='gct-dots';
+    theme.colors.forEach(c=>{ const d=document.createElement('div'); d.className='gct-dot'; d.style.background=c; dots.appendChild(d); });
+    const lbl=document.createElement('div'); lbl.className='gct-name'; lbl.textContent=theme.name;
+    wrap.appendChild(dots); wrap.appendChild(lbl);
+    wrap.onclick=()=>{ selectedGhostTheme=theme; gctEl.querySelectorAll('.gct-chip').forEach(x=>x.classList.remove('active')); wrap.classList.add('active'); };
+    gctEl.appendChild(wrap);
+  });
+
+  // Background
+  const bgEl=document.getElementById('bg-colors');
+  BG_OPTIONS.forEach((bg,i)=>{
+    const wrap=document.createElement('div'); wrap.className='bg-swatch-wrap'+(i===0?' active':'');
+    const swatch=document.createElement('div'); swatch.className='bg-swatch';
+    swatch.style.background=bg.preview; swatch.title=bg.name;
+    const lbl=document.createElement('div'); lbl.className='bg-swatch-name'; lbl.textContent=bg.name;
+    wrap.appendChild(swatch); wrap.appendChild(lbl);
+    wrap.onclick=()=>{ selectedBg=bg; bgEl.querySelectorAll('.bg-swatch-wrap').forEach(x=>x.classList.remove('active')); wrap.classList.add('active'); };
+    bgEl.appendChild(wrap);
+  });
+
+  // Speed
+  document.querySelectorAll('#speed-opts .opt-btn').forEach(btn=>{
+    btn.onclick=()=>{ selectedSpeed=parseFloat(btn.dataset.v); document.querySelectorAll('#speed-opts .opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); };
+  });
+
+  // Music
+  document.querySelectorAll('#music-opts .opt-btn').forEach(btn=>{
+    btn.onclick=()=>{ musicEnabled=btn.dataset.v==='on'; document.querySelectorAll('#music-opts .opt-btn').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); if(!musicEnabled) stopBGM(); };
+  });
+}
+
+// All functions and data defined — safe to call now
+initCustomise();
 </script>
 </body>
 </html>
